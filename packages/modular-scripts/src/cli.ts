@@ -12,6 +12,7 @@ import {
 import inquirer from 'inquirer';
 import resolveAsBin from 'resolve-as-bin';
 import { JSONSchemaForNPMPackageJsonFiles } from '@schemastore/package';
+import buildPackage from './build';
 
 import getModularRoot from './getModularRoot';
 
@@ -71,7 +72,7 @@ function isModularType(dir: string, type: PackageType) {
   return false;
 }
 
-function run() {
+async function run() {
   const help = `
   Usage:
     $ modular add <package-name>
@@ -269,25 +270,30 @@ function start(appPath: string) {
   });
 }
 
-function build(appPath: string) {
+async function build(directoryName: string) {
   const modularRoot = getModularRoot();
 
-  if (!isModularType(path.join(modularRoot, 'packages', appPath), 'app')) {
-    throw new Error(`The package at ${appPath} is not a valid modular app.`);
+  if (isModularType(path.join(modularRoot, 'packages', directoryName), 'app')) {
+    execSync(cracoBin, ['build', '--config', cracoConfig], {
+      cwd: path.join(modularRoot, 'packages', directoryName),
+      log: false,
+      // @ts-ignore
+      env: {
+        MODULAR_ROOT: modularRoot,
+      },
+    });
+  } else {
+    // it's a view/package, run
+    await buildPackage(directoryName);
   }
+}
 
-  execSync(cracoBin, ['build', '--config', cracoConfig], {
-    cwd: path.join(modularRoot, 'packages', appPath),
-    log: false,
-    // @ts-ignore
-    env: {
-      MODULAR_ROOT: modularRoot,
-    },
+void run()
+  .catch((err) => {
+    // todo - cleanup on errors
+    console.error(err);
+    process.exit(1);
+  })
+  .then(() => {
+    // console.log('success! all built.');
   });
-}
-
-try {
-  void run();
-} catch (err) {
-  console.error(err);
-}
